@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useCart } from '../context/CartContext'
 
 // ── Same Product Data ─────────────────────────────────
 const ALL_PRODUCTS = [
@@ -165,6 +166,7 @@ const ALL_PRODUCTS = [
 ]
 
 export default function ProductDetailPage() {
+  const { addToCart } = useCart()
   const { id } = useParams()
   const navigate = useNavigate()
   const product = ALL_PRODUCTS.find(p => p.id === Number(id))
@@ -188,6 +190,7 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = () => {
+    addToCart(product, quantity)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
