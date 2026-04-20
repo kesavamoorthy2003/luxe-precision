@@ -327,20 +327,6 @@ export default function CheckoutPage() {
                     </label>
                   ))}
                 </div>
-
-                {/* Razorpay Note */}
-                {payment === 'razorpay' && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-                    <p className="text-xs text-[#2B3FE7] font-bold mb-1">
-                      Razorpay Integration Ready
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Backend connect பண்ணினா live payments start ஆகும்.
-                      இப்போ test mode-ல் இருக்கு.
-                    </p>
-                  </div>
-                )}
-
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep(1)}
