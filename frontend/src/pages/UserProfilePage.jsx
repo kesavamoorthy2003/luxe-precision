@@ -12,7 +12,7 @@ const MOCK_ADDRESSES = [
     state: 'Tamil Nadu',
     pincode: '600040',
     phone: '+91 98765 43210',
-    isDefault: true,
+    isDefault: true,  
   },
   {
     id: 2,
