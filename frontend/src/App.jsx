@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/common/Navbar'
 import Footer from './components/common/Footer'
 import HomePage from './pages/HomePage'
@@ -9,11 +9,16 @@ import CartPage from './pages/CartPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderHistoryPage from './pages/OrderHistoryPage'
 import UserProfilePage from './pages/UserProfilePage'
+import WishlistPage from './pages/WishlistPage'
+import AdminDashboard from './pages/AdminDashboard'
 
-function App() {
+function AppLayout() {
+  const location = useLocation()
+  const isAdmin = location.pathname.startsWith('/admin')
+
   return (
-    <BrowserRouter>
-      <Navbar />
+    <>
+      {!isAdmin && <Navbar />}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -23,8 +28,18 @@ function App() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/account/orders" element={<OrderHistoryPage />} />
         <Route path="/account/profile" element={<UserProfilePage />} />
+        <Route path="/wishlist" element={<WishlistPage />} />
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
-      <Footer />
+      {!isAdmin && <Footer />}
+    </>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppLayout />
     </BrowserRouter>
   )
 }

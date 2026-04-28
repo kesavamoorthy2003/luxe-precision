@@ -47,27 +47,31 @@ export default function CartPage() {
 
           {/* Cart Items */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            {cartItems.map(item => (
+            {cartItems.map(item => {
+              const product = item.product || item;
+              const linkId = item.productId || item.id;
+              
+              return (
               <div key={item.id}
                 className="flex gap-5 p-4 border border-gray-100 rounded-2xl hover:border-gray-200 transition-all">
 
                 {/* Image */}
                 <div
                   className="w-24 h-24 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 cursor-pointer"
-                  onClick={() => navigate(`/products/${item.id}`)}
+                  onClick={() => navigate(`/products/${linkId}`)}
                 >
-                  <img src={item.image} alt={item.name}
+                  <img src={product.image} alt={product.name}
                     className="w-full h-full object-cover" />
                 </div>
 
                 {/* Info */}
                 <div className="flex-1">
                   <p className="text-[10px] text-[#2B3FE7] font-bold tracking-widest uppercase mb-1">
-                    {item.brand} · {item.category}
+                    {product.brand} · {product.category}
                   </p>
-                  <p className="font-bold text-gray-900 text-sm mb-1">{item.name}</p>
+                  <p className="font-bold text-gray-900 text-sm mb-1">{product.name}</p>
                   <p className="text-[#2B3FE7] font-black">
-                    ${item.price.toLocaleString()}.00
+                    ${(product.price || 0).toLocaleString()}.00
                   </p>
                 </div>
 
@@ -103,7 +107,8 @@ export default function CartPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Order Summary */}

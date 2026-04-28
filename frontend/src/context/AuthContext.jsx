@@ -1,95 +1,89 @@
 import { createContext, useContext, useState } from 'react'
+import API from '../api/axios';
 
 const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    // Page refresh ஆனாலும் login state maintain ஆகும்
     const saved = localStorage.getItem('luxe_user')
     return saved ? JSON.parse(saved) : null
   })
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('luxe_token') || null
+    return localStorage.getItem('accessToken') || null
   })
 
-  // ── Login ──────────────────────────────────────────
   const login = async (email, password) => {
-    // ── இப்போ: Fake login (Frontend only) ──
-    // Future-ல் இந்த block-ஐ மட்டும் மாத்தணும்:
-    // const res = await axios.post('/api/auth/login', { email, password })
-    // const { user, token } = res.data
+    try {
+      const res = await API.post('/auth/login', { email, password });
+      
+      if (res.data.success) {
+        const { accessToken, refreshToken, user: userData } = res.data;
 
-    // Fake data — backend வந்தா இதை remove பண்ணுங்க
-    if (!email || !password) throw new Error('Email and password required')
-    if (password.length < 6) throw new Error('Invalid credentials')
+        const finalUser = {
+          ...userData,
+          phone: userData.phone || '', 
+          avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=2B3FE7&color=fff`,
+          memberSince: userData.createdAt ? new Date(userData.createdAt).getFullYear() : '2024'
+        };
 
-    const fakeUser = {
-      id: 1,
-      name: email.split('@')[0],
-      email: email,
-      avatar: `https://ui-avatars.com/api/?name=${email.split('@')[0]}&background=2B3FE7&color=fff`,
-      memberSince: '2024',
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        localStorage.setItem('luxe_user', JSON.stringify(finalUser));
+
+        setToken(accessToken);
+        setUser(finalUser);
+        return res.data;
+      }
+    } catch (err) {
+      throw new Error(err.response?.data?.message || 'Login failed');
     }
+  };
 
-    // Fake JWT token — backend வந்தா real token வரும்
-    const fakeToken = btoa(JSON.stringify({ userId: 1, email, exp: Date.now() + 86400000 }))
-
-    // Save to localStorage
-    localStorage.setItem('luxe_user', JSON.stringify(fakeUser))
-    localStorage.setItem('luxe_token', fakeToken)
-
-    setUser(fakeUser)
-    setToken(fakeToken)
-
-    return fakeUser
-  }
-
-  // ── Register ───────────────────────────────────────
-  const register = async (name, email, password) => {
-    // Future: const res = await axios.post('/api/auth/register', { name, email, password })
-
-    if (!name || !email || !password) throw new Error('All fields required')
-    if (password.length < 6) throw new Error('Password must be 6+ characters')
-
-    const fakeUser = {
-      id: 1,
-      name,
-      email,
-      avatar: `https://ui-avatars.com/api/?name=${name}&background=2B3FE7&color=fff`,
-      memberSince: '2024',
+  const updateProfile = async (profileData) => {
+    const res = await API.put('/auth/update-profile', profileData);
+    if (res.data.success) {
+      const updatedUser = { ...user, ...res.data.user };
+      setUser(updatedUser);
+      localStorage.setItem('luxe_user', JSON.stringify(updatedUser));
     }
+    return res.data;
+  };
 
-    const fakeToken = btoa(JSON.stringify({ userId: 1, email, exp: Date.now() + 86400000 }))
+  // Upload avatar — sends multipart/form-data
+  const uploadAvatar = async (formData) => {
+    const res = await API.post('/auth/upload-avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    if (res.data.success) {
+      const updatedUser = { ...user, avatar: res.data.avatarUrl };
+      setUser(updatedUser);
+      localStorage.setItem('luxe_user', JSON.stringify(updatedUser));
+    }
+    return res.data;
+  };
 
-    localStorage.setItem('luxe_user', JSON.stringify(fakeUser))
-    localStorage.setItem('luxe_token', fakeToken)
+  const register = async (name, email, phone, password) => {
+    try {
+      const res = await API.post('/auth/register', { name, email, phone, password });
+      return res.data;
+    } catch (err) {
+      throw new Error(err.response?.data?.message || 'Registration failed');
+    }
+  };
 
-    setUser(fakeUser)
-    setToken(fakeToken)
-
-    return fakeUser
-  }
-
-  // ── Logout ─────────────────────────────────────────
   const logout = () => {
-    localStorage.removeItem('luxe_user')
-    localStorage.removeItem('luxe_token')
-    setUser(null)
-    setToken(null)
-  }
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('luxe_user');
+    setUser(null);
+    setToken(null);
+  };
 
-  const isLoggedIn = !!user && !!token
+  const isLoggedIn = !!user && !!token;
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      token,
-      login,
-      register,
-      logout,
-      isLoggedIn,
-    }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isLoggedIn, updateProfile, uploadAvatar }}>
       {children}
     </AuthContext.Provider>
   )

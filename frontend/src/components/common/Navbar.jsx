@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 import { useAuth } from '../../context/AuthContext'
+import { useWishlist } from '../../context/WishlistContext'
 
 export default function Navbar() {
   const { cartCount } = useCart()
+  const { wishlistCount } = useWishlist()
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const { user, isLoggedIn, logout } = useAuth()
@@ -13,8 +15,8 @@ export default function Navbar() {
     { label: 'New Arrivals', path: '/products?category=new-arrivals' },
     { label: 'High Fashion', path: '/products?category=fashion' },
     { label: 'Electronics',  path: '/products?category=electronics' },
-    { label: 'Editorial',    path: '/products' },
-    { label: 'Collections',  path: '/products' },
+    { label: 'Editorial',    path: '/products?category=editorial' },
+    { label: 'Collections',  path: '/products?category=collections' },
   ]
 
   return (
@@ -96,12 +98,21 @@ export default function Navbar() {
           {/* --- DYNAMIC PROFILE SECTION END --- */}
 
           {/* Wishlist Icon */}
-          <button className="text-gray-600 hover:text-[#2B3FE7] transition-colors">
+          <button 
+            onClick={() => navigate('/wishlist')}
+            className="relative text-gray-600 hover:text-[#2B3FE7] transition-colors"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none"
               viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round"
                 d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
             </svg>
+            {wishlistCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px]
+                font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {wishlistCount}
+              </span>
+            )}
           </button>
 
           {/* Cart Icon */}

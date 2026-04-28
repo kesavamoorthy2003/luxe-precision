@@ -1,4 +1,5 @@
 const app = require('./src/app')
+const prisma = require('./src/config/db'); // Path correct-ah paarunga
 
 const PORT = process.env.PORT || 5000
 

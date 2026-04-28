@@ -1,186 +1,62 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
-
-// ── Same Product Data ─────────────────────────────────
-const ALL_PRODUCTS = [
-  { id: 1,  name: 'Spectre Pro 16"',        brand: 'Quantum', category: 'electronics', price: 2499, 
-    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&q=80',
-      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80',
-      'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800&q=80',
-    ],
-    isNew: true, description: 'Ultra-thin aerospace aluminum chassis with M-Series architecture. Engineered for those who demand desktop-class performance in a portable form.', 
-    specs: ['M-Series Processor', '16GB RAM', '512GB SSD', '16" Retina Display', '18hr Battery'] },
-
-  { id: 2,  name: 'Obsidian Studio',         brand: 'Nexus',   category: 'electronics', price: 3150,
-    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80',
-      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&q=80',
-      'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&q=80',
-    ],
-    isNew: false, description: 'Matte black finish with vapor chamber cooling. Intel Core 9 powerhouse built for creators and professionals who refuse to compromise.',
-    specs: ['Intel Core 9', '32GB RAM', '1TB SSD', '15.6" OLED', 'Thunderbolt 4'] },
-
-  { id: 3,  name: 'Zephyr 14 Lightweight',  brand: 'Aero',    category: 'electronics', price: 1899,
-    image: 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800&q=80',
-      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80',
-      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&q=80',
-    ],
-    isNew: false, description: 'The ultimate travel companion. Weighing just 2.1 lbs with a stunning 14" display and all-day battery life.',
-    specs: ['Ryzen 9', '16GB RAM', '512GB SSD', '14" IPS', '20hr Battery'] },
-
-  { id: 4,  name: 'Aura Over-Ear Pro',      brand: 'Quantum', category: 'audio',       price: 399,
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
-      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80',
-      'https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=800&q=80',
-    ],
-    isNew: true, description: 'Studio-grade sound with adaptive noise cancellation. 40mm planar drivers deliver audiophile precision in a refined over-ear design.',
-    specs: ['40mm Planar Drivers', 'ANC Technology', '30hr Battery', 'Bluetooth 5.3', 'Hi-Res Audio'] },
-
-  { id: 5,  name: 'Sonic Precision X',      brand: 'Nexus',   category: 'audio',       price: 299,
-    image: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80',
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
-      'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80',
-    ],
-    isNew: false, description: 'Precision-tuned audio with deep bass response. Foldable design for the on-the-go audiophile.',
-    specs: ['50mm Drivers', 'Hybrid ANC', '25hr Battery', 'Bluetooth 5.0', 'Foldable Design'] },
-
-  { id: 6,  name: 'Chrono Series 4',        brand: 'Aero',    category: 'wearables',   price: 450,
-    image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
-      'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=800&q=80',
-      'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=800&q=80',
-    ],
-    isNew: true, description: 'Precision timepiece meets smart technology. Sapphire crystal display with health monitoring and 7-day battery life.',
-    specs: ['Sapphire Crystal', 'Health Monitor', '7-day Battery', 'GPS', '5ATM Water Resistant'] },
-
-  { id: 7,  name: 'Aether Pro Max',         brand: 'Quantum', category: 'electronics', price: 1499,
-    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&q=80',
-      'https://images.unsplash.com/photo-1580910051074-3eb694886505?w=800&q=80',
-      'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=800&q=80',
-    ],
-    isNew: true, description: 'Engineered for absolute precision. Sculpted ceramic chassis with edge-to-edge sensory display and the revolutionary Quantum Silicon processor.',
-    specs: ['Quantum Silicon 3nm', '50MP Pro Camera', '6.7" OLED 120Hz', '36hr Battery', '5G + WiFi 7'] },
-
-  { id: 8,  name: 'Velocity Run Sneakers',  brand: 'Nexus',   category: 'fashion',     price: 220,
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-    ],
-    isNew: false, description: 'Cloud-cushion technology meets street-ready design. Engineered for the modern athlete who refuses to sacrifice style.',
-    specs: ['Cloud Cushion Sole', 'Breathable Mesh', 'Sizes 6-14', 'Colorway: Cloud White', 'Vegan Materials'] },
-
-  { id: 9,  name: 'Heritage Tote Bag',      brand: 'Aero',    category: 'fashion',     price: 1000,
-    image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
-      'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
-      'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80',
-    ],
-    isNew: false, description: 'Full-grain vegetable-tanned leather. A timeless tote that develops a unique patina over years of use.',
-    specs: ['Full-Grain Leather', 'Brass Hardware', 'Interior Pockets x3', 'Saddle Brown', 'Handcrafted'] },
-
-  { id: 10, name: 'Artisan Leather Oxford', brand: 'Quantum', category: 'fashion',     price: 1245,
-    image: 'https://images.unsplash.com/photo-1449505278894-297fdb3edbc1?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1449505278894-297fdb3edbc1?w=800&q=80',
-      'https://images.unsplash.com/photo-1449505278894-297fdb3edbc1?w=800&q=80',
-      'https://images.unsplash.com/photo-1449505278894-297fdb3edbc1?w=800&q=80',
-    ],
-    isNew: false, description: 'Hand-stitched Goodyear welt construction. Italian calfskin upper with a leather sole that improves with every step.',
-    specs: ['Italian Calfskin', 'Goodyear Welt', 'Size: 42 EU', 'Cognac Brown', 'Handcrafted in Italy'] },
-
-  { id: 11, name: 'Pulse Fit Band',         brand: 'Nexus',   category: 'wearables',   price: 199,
-    image: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=800&q=80',
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
-      'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=800&q=80',
-    ],
-    isNew: true, description: 'Advanced health tracking in a sleek band format. Monitor heart rate, sleep, stress, and 50+ workout modes.',
-    specs: ['Heart Rate Monitor', 'Sleep Tracking', '14-day Battery', '50+ Workouts', 'IP68 Waterproof'] },
-
-  { id: 12, name: 'Cashmere Overcoat',      brand: 'Aero',    category: 'fashion',     price: 1250,
-    image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800&q=80',
-      'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800&q=80',
-      'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800&q=80',
-    ],
-    isNew: false, description: '100% Grade-A Mongolian cashmere. Tailored in a relaxed silhouette for effortless sophistication.',
-    specs: ['100% Cashmere', 'Size: L', 'Camel Color', 'Dry Clean Only', 'Made in Italy'] },
-
-  { id: 13, name: 'ProBook Studio 16"',     brand: 'Quantum', category: 'electronics', price: 3499,
-    image: 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&q=80',
-      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&q=80',
-      'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800&q=80',
-    ],
-    isNew: false, description: 'Professional-grade workstation. 32GB RAM, 1TB SSD, and a stunning silver chassis built for creative professionals.',
-    specs: ['Intel Core i9', '32GB RAM', '1TB SSD', '16" 4K Display', 'NVIDIA RTX 4070'] },
-
-  { id: 14, name: 'NoiseFree Buds',         brand: 'Nexus',   category: 'audio',       price: 179,
-    image: 'https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=800&q=80',
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
-      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80',
-    ],
-    isNew: true, description: 'True wireless earbuds with hybrid active noise cancellation. 8hr playtime with 32hr charging case.',
-    specs: ['Hybrid ANC', '8hr Playtime', '32hr Case', 'IPX4 Rating', 'Wireless Charging'] },
-
-  { id: 15, name: 'Smart Vision Glass',     brand: 'Aero',    category: 'wearables',   price: 899,
-    image: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=800&q=80',
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
-      'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=800&q=80',
-    ],
-    isNew: false, description: 'Augmented reality glasses with voice assistant integration. See the world differently with a 30° field of view.',
-    specs: ['AR Display 30° FOV', 'Voice Assistant', '8hr Battery', 'UV400 Lenses', 'Titanium Frame'] },
-
-  { id: 16, name: 'Minimal Desk Speaker',   brand: 'Quantum', category: 'audio',       price: 349,
-    image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80',
-    images: [
-      'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80',
-      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
-      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80',
-    ],
-    isNew: false, description: 'Minimalist desktop speaker with room-filling 360° sound. Crafted from aerospace aluminum with a fabric grille.',
-    specs: ['360° Sound', '40W Output', 'WiFi + Bluetooth', 'AUX Input', 'Aluminum + Fabric'] },
-]
+import { productService } from '../services/productService'
 
 export default function ProductDetailPage() {
   const { addToCart } = useCart()
   const { id } = useParams()
   const navigate = useNavigate()
-  const product = ALL_PRODUCTS.find(p => p.id === Number(id))
-
+  
+  const [product, setProduct] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
   const [activeImg, setActiveImg] = useState(0)
   const [quantity, setQuantity]   = useState(1)
   const [added, setAdded]         = useState(false)
+  const [related, setRelated]     = useState([])
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const response = await productService.getProductById(id)
+        if (response.success && response.data) {
+          setProduct(response.data)
+          // Fetch related products
+          const relatedResponse = await productService.getAllProducts({ category: response.data.category })
+          if (relatedResponse.success) {
+            setRelated(relatedResponse.data.filter(p => p.id !== response.data.id).slice(0, 4))
+          }
+        } else {
+          setError('Product not found')
+        }
+      } catch (err) {
+        setError('Error fetching product')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProduct()
+    window.scrollTo(0, 0)
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2B3FE7]"></div>
+      </div>
+    )
+  }
 
   // Product not found
-  if (!product) {
+  if (error || !product) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-5xl">😕</p>
-        <p className="text-xl font-bold text-gray-900">Product not found</p>
+        <p className="text-xl font-bold text-gray-900">{error || 'Product not found'}</p>
         <button onClick={() => navigate('/products')}
           className="px-6 py-3 bg-[#2B3FE7] text-white rounded-full text-sm font-bold">
           Back to Products
@@ -194,11 +70,6 @@ export default function ProductDetailPage() {
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
-
-  // Related products — same category, exclude current
-  const related = ALL_PRODUCTS
-    .filter(p => p.category === product.category && p.id !== product.id)
-    .slice(0, 4)
 
   return (
     <div className="min-h-screen bg-white">
@@ -229,7 +100,7 @@ export default function ProductDetailPage() {
             {/* Main Image */}
             <div className="relative overflow-hidden rounded-2xl bg-gray-50 aspect-square">
               <img
-                src={product.images[activeImg]}
+                src={product.images && product.images.length > 0 ? product.images[activeImg] : product.image}
                 alt={product.name}
                 className="w-full h-full object-cover transition-all duration-500"
               />
@@ -242,20 +113,22 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Thumbnail Strip */}
-            <div className="flex gap-3">
-              {product.images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveImg(i)}
-                  className={`flex-1 aspect-square rounded-xl overflow-hidden border-2 transition-all
-                    ${activeImg === i
-                      ? 'border-[#2B3FE7] shadow-lg shadow-blue-100'
-                      : 'border-transparent hover:border-gray-200'}`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+            {product.images && product.images.length > 0 && (
+              <div className="flex gap-3">
+                {product.images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImg(i)}
+                    className={`flex-1 aspect-square rounded-xl overflow-hidden border-2 transition-all
+                      ${activeImg === i
+                        ? 'border-[#2B3FE7] shadow-lg shadow-blue-100'
+                        : 'border-transparent hover:border-gray-200'}`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Right: Product Info ── */}
@@ -274,7 +147,7 @@ export default function ProductDetailPage() {
 
             {/* Price */}
             <p className="text-3xl font-black text-[#2B3FE7] mb-6">
-              ${product.price.toLocaleString()}.00
+              ${product.price?.toLocaleString()}.00
             </p>
 
             {/* Description */}
@@ -283,20 +156,22 @@ export default function ProductDetailPage() {
             </p>
 
             {/* Specs */}
-            <div className="mb-8">
-              <p className="text-xs font-bold tracking-[0.2em] uppercase text-gray-900 mb-3">
-                Key Specs
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {product.specs.map((spec, i) => (
-                  <span key={i}
-                    className="px-3 py-1.5 bg-gray-50 border border-gray-100 
-                      rounded-full text-xs text-gray-600 font-medium">
-                    {spec}
-                  </span>
-                ))}
+            {product.specs && product.specs.length > 0 && (
+              <div className="mb-8">
+                <p className="text-xs font-bold tracking-[0.2em] uppercase text-gray-900 mb-3">
+                  Key Specs
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {product.specs.map((spec, i) => (
+                    <span key={i}
+                      className="px-3 py-1.5 bg-gray-50 border border-gray-100 
+                        rounded-full text-xs text-gray-600 font-medium">
+                      {spec}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Quantity */}
             <div className="mb-6">
@@ -323,7 +198,7 @@ export default function ProductDetailPage() {
                 </div>
                 <p className="text-sm text-gray-400">
                   Total: <span className="text-gray-900 font-bold">
-                    ${(product.price * quantity).toLocaleString()}.00
+                    ${((product.price || 0) * quantity).toLocaleString()}.00
                   </span>
                 </p>
               </div>
@@ -342,7 +217,18 @@ export default function ProductDetailPage() {
                 {added ? '✓ Added to Bag' : 'Add to Bag'}
               </button>
               <button
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate('/checkout', {
+                  state: {
+                    buyNowItem: {
+                      productId: product.id,
+                      name:      product.name,
+                      brand:     product.brand,
+                      price:     product.price,
+                      image:     product.image,
+                      quantity,
+                    }
+                  }
+                })}
                 className="w-full py-4 border-2 border-gray-900 text-gray-900 
                   rounded-full font-bold text-sm tracking-widest uppercase
                   hover:bg-gray-900 hover:text-white transition-all duration-300"
@@ -408,7 +294,7 @@ export default function ProductDetailPage() {
                     group-hover:text-[#2B3FE7] transition-colors">
                     {p.name}
                   </p>
-                  <p className="font-bold text-gray-900">${p.price.toLocaleString()}.00</p>
+                  <p className="font-bold text-gray-900">${p.price?.toLocaleString()}.00</p>
                 </div>
               ))}
             </div>
