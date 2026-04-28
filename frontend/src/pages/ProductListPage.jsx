@@ -1,27 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { productService } from '../services/productService'
+import { useWishlist } from '../context/WishlistContext'
 
-// ── Mock Data ─────────────────────────────────────────
-const ALL_PRODUCTS = [
-  { id: 1,  name: 'Spectre Pro 16"',        brand: 'Quantum', category: 'electronics', price: 2499, image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500&q=80', isNew: true },
-  { id: 2,  name: 'Obsidian Studio',         brand: 'Nexus',   category: 'electronics', price: 3150, image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&q=80', isNew: false },
-  { id: 3,  name: 'Zephyr 14 Lightweight',  brand: 'Aero',    category: 'electronics', price: 1899, image: 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=500&q=80', isNew: false },
-  { id: 4,  name: 'Aura Over-Ear Pro',      brand: 'Quantum', category: 'audio',       price: 399,  image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80', isNew: true },
-  { id: 5,  name: 'Sonic Precision X',      brand: 'Nexus',   category: 'audio',       price: 299,  image: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500&q=80', isNew: false },
-  { id: 6,  name: 'Chrono Series 4',        brand: 'Aero',    category: 'wearables',   price: 450,  image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80', isNew: true },
-  { id: 7,  name: 'Aether Pro Max',         brand: 'Quantum', category: 'electronics', price: 1499, image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&q=80', isNew: true },
-  { id: 8,  name: 'Velocity Run Sneakers',  brand: 'Nexus',   category: 'fashion',     price: 220,  image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80', isNew: false },
-  { id: 9,  name: 'Heritage Tote Bag',      brand: 'Aero',    category: 'fashion',     price: 1000, image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=500&q=80', isNew: false },
-  { id: 10, name: 'Artisan Leather Oxford', brand: 'Quantum', category: 'fashion',     price: 1245, image: 'https://images.unsplash.com/photo-1449505278894-297fdb3edbc1?w=500&q=80', isNew: false },
-  { id: 11, name: 'Pulse Fit Band',         brand: 'Nexus',   category: 'wearables',   price: 199,  image: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=500&q=80', isNew: true },
-  { id: 12, name: 'Cashmere Overcoat',      brand: 'Aero',    category: 'fashion',     price: 1250, image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500&q=80', isNew: false },
-  { id: 13, name: 'ProBook Studio 16"',     brand: 'Quantum', category: 'electronics', price: 3499, image: 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=500&q=80', isNew: false },
-  { id: 14, name: 'NoiseFree Buds',         brand: 'Nexus',   category: 'audio',       price: 179,  image: 'https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=500&q=80', isNew: true },
-  { id: 15, name: 'Smart Vision Glass',     brand: 'Aero',    category: 'wearables',   price: 899,  image: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=500&q=80', isNew: false },
-  { id: 16, name: 'Minimal Desk Speaker',   brand: 'Quantum', category: 'audio',       price: 349,  image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500&q=80', isNew: false },
-]
-
-const CATEGORIES = ['all', 'new-arrivals', 'electronics', 'audio', 'wearables', 'fashion']
+const CATEGORIES = ['all', 'new-arrivals', 'electronics', 'audio', 'wearables', 'fashion', 'editorial', 'collections']
 const BRANDS     = ['Quantum', 'Nexus', 'Aero']
 const SORT_OPTIONS = [
   { label: 'Curated',     value: 'curated' },
@@ -37,12 +19,16 @@ const CATEGORY_LABELS = {
   'audio':        'Audio',
   'wearables':    'Wearables',
   'fashion':      'High Fashion',
+  'editorial':    'Editorial',
+  'collections':  'Collections',
 }
 
 // ── Product Card ──────────────────────────────────────
 function ProductCard({ product }) {
-  const [wished, setWished] = useState(false)
+  const { isWished, toggleWishlist } = useWishlist()
   const navigate = useNavigate()
+  
+  const wished = isWished(product.id)
 
   return (
     <div className="group cursor-pointer" onClick={() => navigate(`/products/${product.id}`)}>
@@ -61,7 +47,7 @@ function ProductCard({ product }) {
         )}
 
         <button
-          onClick={(e) => { e.stopPropagation(); setWished(!wished) }}
+          onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id) }}
           className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90
             backdrop-blur-sm flex items-center justify-center shadow-sm hover:scale-110 transition-all"
         >
@@ -86,7 +72,7 @@ function ProductCard({ product }) {
         group-hover:text-[#2B3FE7] transition-colors leading-snug">
         {product.name}
       </p>
-      <p className="text-gray-900 font-bold">${product.price.toLocaleString()}.00</p>
+      <p className="text-gray-900 font-bold">${product.price?.toLocaleString()}.00</p>
     </div>
   )
 }
@@ -214,26 +200,50 @@ export default function ProductListPage() {
   const [view, setView]               = useState('grid')
   const [mobileFilter, setMobileFilter] = useState(false)
 
-  // ✅ URL change ஆனா filter automatically update ஆகும்
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // URL change sync
   useEffect(() => {
     const cat = searchParams.get('category') || 'all'
     setFilters(f => ({ ...f, category: cat }))
   }, [searchParams])
 
-  // ✅ Filter + Sort logic
-  const filtered = useMemo(() => {
-    let list = [...ALL_PRODUCTS]
-
-    if (filters.search)
-      list = list.filter(p =>
-        p.name.toLowerCase().includes(filters.search.toLowerCase()))
-
-    // ✅ new-arrivals = isNew: true products
-    if (filters.category === 'new-arrivals') {
-      list = list.filter(p => p.isNew === true)
-    } else if (filters.category !== 'all') {
-      list = list.filter(p => p.category === filters.category)
+  // Fetch products from API when category, search, or sort changes
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const response = await productService.getAllProducts({
+          category: filters.category,
+          search: filters.search,
+          sort: sort
+        })
+        if (response.success) {
+          setProducts(response.data)
+        } else {
+          setError(response.message || 'Failed to fetch products')
+        }
+      } catch (err) {
+        setError(err.message || 'Error loading products')
+      } finally {
+        setLoading(false)
+      }
     }
+    
+    // Add small debounce for search
+    const delayDebounceFn = setTimeout(() => {
+      fetchProducts()
+    }, 300)
+
+    return () => clearTimeout(delayDebounceFn)
+  }, [filters.category, filters.search, sort])
+
+  // Local filtering for brands, minPrice, maxPrice
+  const filtered = useMemo(() => {
+    let list = [...products]
 
     if (filters.brands.length)
       list = list.filter(p => filters.brands.includes(p.brand))
@@ -244,13 +254,8 @@ export default function ProductListPage() {
     if (filters.maxPrice)
       list = list.filter(p => p.price <= Number(filters.maxPrice))
 
-    if (sort === 'price-asc')  list.sort((a, b) => a.price - b.price)
-    if (sort === 'price-desc') list.sort((a, b) => b.price - a.price)
-    if (sort === 'newest')
-      list = list.filter(p => p.isNew).concat(list.filter(p => !p.isNew))
-
     return list
-  }, [filters, sort])
+  }, [products, filters.brands, filters.minPrice, filters.maxPrice])
 
   return (
     <div className="min-h-screen bg-white">
@@ -261,7 +266,6 @@ export default function ProductListPage() {
           <p className="text-[#2B3FE7] text-xs font-bold tracking-[0.3em] uppercase mb-2">
             Luxe Precision
           </p>
-          {/* ✅ Title சரியா காட்டும் */}
           <h1 className="text-4xl font-black text-white">
             {CATEGORY_LABELS[filters.category] || filters.category}
           </h1>
@@ -337,7 +341,16 @@ export default function ProductListPage() {
           </aside>
 
           <div className="flex-1">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="flex justify-center items-center py-32">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2B3FE7]"></div>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center text-red-500">
+                <p className="text-xl font-bold mb-2">Oops!</p>
+                <p>{error}</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-32 text-center">
                 <p className="text-4xl mb-4">🔍</p>
                 <p className="text-gray-900 font-bold text-lg mb-2">No products found</p>

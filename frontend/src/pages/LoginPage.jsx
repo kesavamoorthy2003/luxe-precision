@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [error, setError]     = useState('')
 
   const [form, setForm] = useState({
-    name: '', email: '', password: '', confirmPassword: ''
+    name: '', email: '', phone: '', password: '', confirmPassword: ''
   })
 
   const update = (field, value) => {
@@ -29,7 +29,7 @@ export default function LoginPage() {
         if (form.password !== form.confirmPassword) {
           throw new Error('Passwords do not match')
         }
-        await register(form.name, form.email, form.password)
+        await register(form.name, form.email, form.phone, form.password)
       }
       navigate('/')
     } catch (err) {
@@ -109,6 +109,23 @@ export default function LoginPage() {
                   placeholder="Your name"
                   value={form.name}
                   onChange={e => update('name', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
+                    outline-none focus:border-[#2B3FE7] transition-colors"
+                />
+              </div>
+            )}
+
+            {/* Phone — only register */}
+            {tab === 'register' && (
+              <div>
+                <label className="text-xs font-bold tracking-widest uppercase text-gray-500 mb-1 block">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Your phone number"
+                  value={form.phone}
+                  onChange={e => update('phone', e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
                     outline-none focus:border-[#2B3FE7] transition-colors"
                 />

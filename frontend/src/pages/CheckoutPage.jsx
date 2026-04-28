@@ -1,94 +1,253 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
+import { useAuth } from '../context/AuthContext'
+import { orderService } from '../services/orderService'
 
 const STEPS = ['Information', 'Shipping', 'Payment']
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Tamil Nadu', 'Karnataka', 'Kerala', 'Maharashtra',
   'Delhi', 'Gujarat', 'Rajasthan', 'Uttar Pradesh', 'West Bengal',
-  'Telangana', 'Punjab', 'Haryana', 'Bihar', 'Odisha'
+  'Telangana', 'Punjab', 'Haryana', 'Bihar', 'Odisha',
 ]
+
+// ── Inline Toast ───────────────────────────────────────
+function Toast({ message, type, onClose }) {
+  const colors = {
+    success: 'bg-green-500',
+    error:   'bg-red-500',
+    info:    'bg-[#2B3FE7]',
+  }
+  return (
+    <div className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-4
+      rounded-2xl text-white shadow-2xl text-sm font-semibold max-w-sm
+      animate-slide-up ${colors[type] || colors.info}`}
+    >
+      <span className="flex-1">{message}</span>
+      <button onClick={onClose} className="opacity-70 hover:opacity-100 text-lg leading-none">×</button>
+    </div>
+  )
+}
+
+// ── Load Razorpay script once ──────────────────────────
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true)
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
+}
 
 export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart()
+  const { user, isLoggedIn } = useAuth()
   const navigate = useNavigate()
 
-  const [step, setStep] = useState(0)
+  const location   = useLocation()
+  const buyNowItem = location.state?.buyNowItem ?? null   // { productId, name, brand, price, image, quantity }
+  const isBuyNow   = !!buyNowItem
+
+  const [step, setStep]               = useState(0)
   const [orderPlaced, setOrderPlaced] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [placedOrderId, setPlacedOrderId] = useState(null)
+  const [toast, setToast]             = useState(null)
 
   const [info, setInfo] = useState({
-    email: '', firstName: '', lastName: '',
-    address: '', apartment: '', city: '',
-    state: 'Tamil Nadu', pincode: '', phone: '',
+    email:      user?.email || '',
+    firstName:  user?.name?.split(' ')[0] || '',
+    lastName:   user?.name?.split(' ')[1] || '',
+    address:    '',
+    apartment:  '',
+    city:       '',
+    state:      'Tamil Nadu',
+    pincode:    '',
+    phone:      user?.phone || '',
     newsletter: false,
   })
 
   const [shipping, setShipping] = useState('standard')
-  const [payment, setPayment] = useState('razorpay')
+  const [payment, setPayment]   = useState('razorpay')
 
-  const shippingCost = cartTotal > 500 ? 0 : 50
-  const tax = Math.round(cartTotal * 0.05)
-  const total = cartTotal + shippingCost + tax
+  // ── Buy Now vs Cart totals ────────────────────────
+  const displayItems = isBuyNow
+    ? [buyNowItem]                  // single product from product page
+    : cartItems                     // regular cart items
 
-  // ── Razorpay Handler ──────────────────────────────
-  const handleRazorpay = () => {
+  const baseTotal    = isBuyNow
+    ? buyNowItem.price * buyNowItem.quantity
+    : cartTotal
+
+  const shippingCost = baseTotal > 500 ? 0 : 50
+  const tax          = Math.round(baseTotal * 0.05)
+  const total        = baseTotal + shippingCost + tax
+
+  const showToast = useCallback((message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 4000)
+  }, [])
+
+  // ── Razorpay Payment Handler ───────────────────────
+  const handleRazorpay = async () => {
+    if (!isLoggedIn) {
+      showToast('Please log in to complete your purchase.', 'error')
+      return navigate('/login')
+    }
+
     setLoading(true)
 
-    // Future-ல் backend இருந்தா — order_id இங்க வரும்
-    // const res = await axios.post('/api/create-order', { amount: total * 100 })
-
-    const options = {
-      key: 'YOUR_RAZORPAY_KEY', // ← Backend ready ஆனா இங்க key போடுங்க
-      amount: total * 100, // paise
-      currency: 'INR',
-      name: 'Luxe Precision',
-      description: 'Premium Order',
-      // order_id: res.data.id, // ← Backend ready ஆனா uncomment பண்ணுங்க
-      prefill: {
-        name: `${info.firstName} ${info.lastName}`,
-        email: info.email,
-        contact: info.phone,
-      },
-      theme: { color: '#2B3FE7' },
-      handler: function (response) {
-        // Payment success
+    try {
+      // 1. Load Razorpay JS SDK
+      const loaded = await loadRazorpayScript()
+      if (!loaded) {
+        showToast('Failed to load payment gateway. Check your internet connection.', 'error')
         setLoading(false)
-        setOrderPlaced(true)
-        clearCart()
-        // Future: axios.post('/api/verify-payment', response)
-      },
-    }
+        return
+      }
 
-    // Razorpay script load பண்ணுங்க
-    const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.onload = () => {
-      const rzp = new window.Razorpay(options)
-      rzp.on('payment.failed', () => {
-        setLoading(false)
-        alert('Payment failed. Please try again.')
+      // 2. Build items payload — Buy Now uses a single item, Cart uses all items
+      const cartPayload = isBuyNow
+        ? [{ productId: buyNowItem.productId, quantity: buyNowItem.quantity }]
+        : cartItems.map(item => ({
+            productId: item.productId || item.id,
+            quantity:  item.quantity,
+          }))
+
+      // 3. Create order on backend → get razorpayOrderId
+      const orderRes = await orderService.createRazorpayOrder({
+        cartItems:    cartPayload,
+        shippingInfo: info,
+        shippingCost,
+        tax,
       })
+
+      if (!orderRes.success) {
+        showToast(orderRes.message || 'Failed to initiate payment.', 'error')
+        setLoading(false)
+        return
+      }
+
+      const { razorpayOrderId, amount, dbOrderId } = orderRes.data
+
+      // 4. Open Razorpay modal
+      const options = {
+        key:         import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_SiWz05yxSDlA4e',
+        amount,
+        currency:    'INR',
+        name:        'Luxe Precision',
+        description: 'Premium Shopping Experience',
+        image:       '/logo.png',
+        order_id:    razorpayOrderId,
+        prefill: {
+          name:    `${info.firstName} ${info.lastName}`.trim(),
+          email:   info.email,
+          contact: info.phone,
+          method:  'upi',
+        },
+        theme: { color: '#2B3FE7' },
+
+        // ── Enable payment methods (use integers — more reliable in test mode) ──
+        // Do NOT combine with config.display custom blocks — they conflict.
+        method: {
+          upi:        1,
+          card:       1,
+          netbanking: 1,
+          wallet:     1,
+          emi:        0,
+          paylater:   0,
+        },
+
+        // ── Success handler ──
+        handler: async (response) => {
+          try {
+            const verifyRes = await orderService.verifyPayment({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              dbOrderId,
+            })
+
+            if (verifyRes.success) {
+              // Only clear cart for regular checkout — Buy Now leaves bag untouched
+              if (!isBuyNow) await clearCart()
+              setPlacedOrderId(dbOrderId)
+              setOrderPlaced(true)
+            } else {
+              showToast('Payment verification failed. Please contact support.', 'error')
+            }
+          } catch (err) {
+            console.error('Verify error:', err)
+            showToast('Payment recorded but verification failed. We will resolve this shortly.', 'error')
+          } finally {
+            setLoading(false)
+          }
+        },
+
+        modal: {
+          ondismiss: () => {
+            setLoading(false)
+            showToast('Payment cancelled. You can retry anytime.', 'info')
+          },
+        },
+      }
+
+      const rzp = new window.Razorpay(options)
+
+      rzp.on('payment.failed', (response) => {
+        setLoading(false)
+        showToast(
+          `Payment failed: ${response.error?.description || 'Something went wrong. Please try again.'}`,
+          'error'
+        )
+      })
+
       rzp.open()
+    } catch (err) {
+      console.error('Payment error:', err)
+      showToast(err?.response?.data?.message || 'Payment failed. Please try again.', 'error')
+      setLoading(false)
     }
-    document.body.appendChild(script)
   }
 
-  // ── Order Placed Screen ───────────────────────────
+  // ── COD Handler ───────────────────────────────────
+  const handleCOD = async () => {
+    setLoading(true)
+    try {
+      if (!isBuyNow) await clearCart()   // only clear cart in normal checkout
+      setOrderPlaced(true)
+    } catch {
+      showToast('Something went wrong. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ── Order Success Screen ───────────────────────────
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-6 px-6">
-        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center">
-          <svg className="w-10 h-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="w-24 h-24 rounded-full bg-green-50 flex items-center justify-center
+          ring-8 ring-green-100 animate-bounce-once">
+          <svg className="w-12 h-12 text-green-500" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-black text-gray-900">Order Confirmed!</h1>
-        <p className="text-gray-400 text-center max-w-sm">
+        <h1 className="text-4xl font-black text-gray-900">Order Confirmed!</h1>
+        <p className="text-gray-400 text-center max-w-sm leading-relaxed">
           Thank you for your purchase. Your order has been placed successfully.
           You'll receive a confirmation email shortly.
         </p>
+        {placedOrderId && (
+          <div className="bg-gray-50 rounded-2xl px-8 py-4 text-center">
+            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Order ID</p>
+            <p className="text-lg font-black text-gray-900">#{placedOrderId}</p>
+          </div>
+        )}
         <div className="bg-gray-50 rounded-2xl p-6 w-full max-w-sm text-center">
           <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Order Total</p>
           <p className="text-3xl font-black text-[#2B3FE7]">₹{total.toLocaleString()}.00</p>
@@ -115,6 +274,15 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-white">
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* Top Bar */}
       <div className="border-b border-gray-100 py-4 px-6 flex items-center justify-between">
@@ -179,10 +347,8 @@ export default function CheckoutPage() {
 
                   <h2 className="text-xl font-black text-gray-900 mt-4 mb-2">Shipping Address</h2>
 
-                  <select
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
-                      outline-none focus:border-[#2B3FE7] bg-white"
-                  >
+                  <select className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
+                    outline-none focus:border-[#2B3FE7] bg-white">
                     <option>India</option>
                   </select>
 
@@ -224,7 +390,7 @@ export default function CheckoutPage() {
 
                 <button
                   onClick={() => setStep(1)}
-                  disabled={!info.email || !info.firstName || !info.address}
+                  disabled={!info.email || !info.firstName || !info.address || !info.city || !info.pincode}
                   className="w-full mt-8 py-4 bg-[#2B3FE7] text-white font-bold text-sm
                     tracking-widest uppercase rounded-full hover:bg-blue-700 transition-all
                     disabled:opacity-40 disabled:cursor-not-allowed"
@@ -327,6 +493,18 @@ export default function CheckoutPage() {
                     </label>
                   ))}
                 </div>
+
+                {/* Razorpay badge */}
+                {payment === 'razorpay' && (
+                  <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <p className="text-xs text-blue-700 font-semibold flex items-center gap-2">
+                      <span>⚡</span>
+                      You'll be redirected to Razorpay's secure payment page.
+                      Supports UPI, Credit/Debit Cards, Net Banking & Wallets.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep(1)}
@@ -336,13 +514,22 @@ export default function CheckoutPage() {
                     ← Back
                   </button>
                   <button
-                    onClick={payment === 'razorpay' ? handleRazorpay : () => { setOrderPlaced(true); clearCart() }}
+                    onClick={payment === 'razorpay' ? handleRazorpay : handleCOD}
                     disabled={loading}
                     className="flex-1 py-4 bg-[#2B3FE7] text-white font-bold text-sm
                       tracking-widest uppercase rounded-full hover:bg-blue-700 transition-all
-                      disabled:opacity-60"
+                      disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {loading ? 'Processing...' : `Pay ₹${total.toLocaleString()}`}
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Processing...
+                      </>
+                    ) : `Pay ₹${total.toLocaleString()}`}
                   </button>
                 </div>
               </div>
@@ -361,35 +548,52 @@ export default function CheckoutPage() {
           <div className="lg:border-l lg:border-gray-100 lg:pl-16">
             <p className="font-black text-gray-900 mb-6">Order Summary</p>
 
-            {/* Items */}
+            {/* Items — Buy Now shows single product; Cart shows all items */}
+            {isBuyNow && (
+              <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl">
+                <p className="text-[10px] font-bold text-[#2B3FE7] uppercase tracking-widest">
+                  ⚡ Direct Purchase — Your bag is unaffected
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-4 mb-6">
-              {cartItems.map(item => (
-                <div key={item.id} className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50">
-                      <img src={item.image} alt={item.name}
-                        className="w-full h-full object-cover" />
+              {displayItems.map((item, idx) => {
+                // Support both cart-item shape and buyNowItem shape
+                const product = item.product || item
+                const price   = product.price ?? item.price ?? 0
+                const image   = product.image ?? item.image
+                const name    = product.name  ?? item.name
+                const brand   = product.brand ?? item.brand
+                const key     = item.id ?? item.productId ?? idx
+
+                return (
+                  <div key={key} className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50">
+                        <img src={image} alt={name} className="w-full h-full object-cover" />
+                      </div>
+                      <span className="absolute -top-2 -right-2 bg-[#2B3FE7] text-white
+                        text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {item.quantity}
+                      </span>
                     </div>
-                    <span className="absolute -top-2 -right-2 bg-[#2B3FE7] text-white
-                      text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {item.quantity}
-                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900">{name}</p>
+                      <p className="text-xs text-gray-400">{brand}</p>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900">
+                      ₹{(price * item.quantity).toLocaleString()}.00
+                    </p>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">{item.name}</p>
-                    <p className="text-xs text-gray-400">{item.brand}</p>
-                  </div>
-                  <p className="text-sm font-bold text-gray-900">
-                    ₹{(item.price * item.quantity).toLocaleString()}.00
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <div className="border-t border-gray-100 pt-4 flex flex-col gap-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Subtotal</span>
-                <span className="font-semibold">₹{cartTotal.toLocaleString()}.00</span>
+                <span className="font-semibold">₹{baseTotal.toLocaleString()}.00</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Shipping</span>
